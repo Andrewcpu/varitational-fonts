@@ -51,6 +51,7 @@ class AbstractLossLayer(ABC):
             optimizer.zero_grad()
             loss.backward(retain_graph=True)
             optimizer.step()
+            optimizer.zero_grad()
 
         self.last_loss = loss.item()
         return loss

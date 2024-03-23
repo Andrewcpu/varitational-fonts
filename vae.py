@@ -788,6 +788,6 @@ class VAE(nn.Module):
         max_len = 1
         for i in range(0, max_len):
             img = self.enhancement.model(img, style, z)
-        return img, mu, log_var, refined, z, style
+        return img, mu, log_var, unrefined, z, style
 
         # return self.decoder(z, target_labels), mu, log_var, mu2, log_var2

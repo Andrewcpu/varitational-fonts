@@ -23,7 +23,7 @@ class EnhancementModule(AbstractAdvancedModule):
         self.image_size = 224
         self.chunk_size = 32
         super().__init__(root_dir)
-        self.add_loss_layer('MSEg', AdvGANMSELoss(self.model, ratio=0.2))
+        self.add_loss_layer('MSEg', AdvGANMSELoss(self.model, ratio=0.1))
 
     def setup_model(self):
         return ImageChunkProcessor(self.chunk_size,
@@ -43,12 +43,12 @@ class VAEModule(AbstractAdvancedModule):
         self.enhancement = enhancement_module
         super().__init__(root_dir)
         params = {
-            'mse_ratio': 0.15,
+            'mse_ratio': 0.3,
             'perceptual_layers': ['2', '7'],
             'perceptual_scale': 100.0,
             'similarity_weight': 0.01,
             'kl_divergence_beta': 0.0001,
-            'curve_weight': 2500,
+            'curve_weight': 2000,
             'secondary_mse_ratio': 0.085,
             'primary_gan_loss_ratio': 10.0,
             'style_gan_loss_ratio': 200.0,
@@ -81,7 +81,7 @@ class VAEModule(AbstractAdvancedModule):
                    device=device).to(device)
 
     def setup_optimizer(self):
-        return optim.Adam(self.model.parameters(), lr=0.0001)
+        return optim.Adam(self.model.parameters(), lr=0.001)
 
     def preprocess_training_input(self, batch_data):
         images, char_embs, cap_idx, secondary_images, secondary_char_embs, secondary_idx, label, random_image = batch_data

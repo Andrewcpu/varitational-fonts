@@ -63,7 +63,6 @@ def plot_multiple_losses(ax, loss_lists):
 
         # Average every avg_points batches
         num_averaged_points = num_points // avg_points
-        averaged_indices = batch_indices_np[:num_averaged_points * avg_points:avg_points]
         averaged_values = np.mean(loss_values_np[:num_averaged_points * avg_points].reshape(-1, avg_points), axis=1)
 
         # Normalize the averaged values between 0 and 1
@@ -71,7 +70,18 @@ def plot_multiple_losses(ax, loss_lists):
         max_val = np.max(averaged_values)
         normalized_values = (averaged_values - min_val) / (max_val - min_val)
 
+        averaged_indices = batch_indices_np[:num_averaged_points * avg_points:avg_points]
+
+        # Extend averaged_indices if necessary
+        if len(normalized_values) > len(averaged_indices):
+            num_extra_points = len(normalized_values) - len(averaged_indices)
+            extra_indices = [-1] * num_extra_points  # Placeholder values
+            averaged_indices = np.concatenate((averaged_indices, extra_indices))
+
         ax.plot(averaged_indices, normalized_values, label=loss_name, color=colors[i], linestyle='-')
+
+        # averaged_indices = batch_indices_np[:num_averaged_points * avg_points:avg_points]
+        # ax.plot(averaged_indices, normalized_values, label=loss_name, color=colors[i], linestyle='-')
 
         # Add labels at the highest and lowest points of each line with actual loss values
         max_idx = np.argmax(averaged_values)
@@ -114,10 +124,10 @@ if __name__ == '__main__':
     discriminator_module = DiscriminatorModule('J:/model_checkpoints/disc/')
     enhancement = EnhancementModule('J:/model_checkpoints/enhancement/', device=device)
     vae_module = VAEModule('J:/model_checkpoints/vae/', discriminator=discriminator_module, style_discriminator=style_module, enhancement_module=enhancement)
-    # vae_module.load_state()
-    # discriminator_module.load_state()
-    # style_module.load_state()
-    # enhancement.load_state()
+    vae_module.load_state()
+    discriminator_module.load_state()
+    style_module.load_state()
+    enhancement.load_state()
     dataloader = DataLoader(font_dataset, batch_size=batch_size, shuffle=True, num_workers=2)
     latent_dims = 16
     for batch_idx, (images, char_embs, cap_idx, secondary_images,
@@ -142,9 +152,14 @@ if __name__ == '__main__':
 
         detached_new_recon = add_noise(secondary_images, 0.2)
 
-        enhancement.step(((detached_new_recon, detached_style_new, detached_latent_new), (images, char_embs, cap_idx, secondary_images,
+        enhancement_loss, enhanced_imgs = enhancement.step(((detached_new_recon, detached_style_new, detached_latent_new), (images, char_embs, cap_idx, secondary_images,
                     secondary_char_embs, secondary_idx, label, random_image)))
         style_loss, style_output = style_module.step((images, random_image, secondary_images))
+
+
+        # detached_enhanced = enhanced_imgs.detach()
+        # detached_enhanced_new = torch.autograd.Variable(detached_enhanced, requires_grad=True)
+        # style_loss, style_output = style_module.step((images, detached_enhanced_new, secondary_images))
         # disc_loss = train_discriminator(real_discriminator, secondary_images, recon_batch, real_discriminator_optimizer)
         # Detach the value from the graph
         detached_value = recon_batch.detach()
@@ -165,10 +180,12 @@ if __name__ == '__main__':
             enhancement.log_status()
             display_chart(0, batch_idx, images, recon_batch, stylized_result, label, loss_lists,)
         if batch_idx % 1000 == 0:
+            print("SAVING")
             vae_module.save_state()
             style_module.save_state()
             discriminator_module.save_state()
             enhancement.save_state()
+            print("SAVED")
 
 
         # Style: test_images, real_test_images

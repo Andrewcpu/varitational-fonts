@@ -118,8 +118,9 @@ class AdvPerceptualLoss(AbstractLossLayer):
     def calculate_loss(self, batch_data, model_output, prepared_input_passthrough_data, shared_output=None):
         recon_batch, mu, logvar, out_z, actual_z, style = model_output
         images, char_embs, cap_idx, secondary_images, secondary_char_embs, secondary_idx, label, random_image = prepared_input_passthrough_data
-        return self._perceptual_loss(recon_batch, secondary_images, self.feature_extractor, self.layers) * self.scale
-
+        loss = self._perceptual_loss(recon_batch, secondary_images, self.feature_extractor, self.layers) * self.scale
+        loss = loss + self._perceptual_loss(out_z, secondary_images, self.feature_extractor, self.layers) * self.scale
+        return loss
 
 class AdvMSELoss(AbstractLossLayer):
     def __init__(self, model, ratio=None, secondary_ratio=None):
@@ -128,10 +129,10 @@ class AdvMSELoss(AbstractLossLayer):
         self.secondary_ratio = secondary_ratio
 
     def calculate_loss(self, batch_data, model_output, prepared_input_passthrough_data, shared_output=None):
-        recon_batch, mu, logvar, out_z, actual_z, style = model_output
+        recon_batch, mu, logvar, unrefined, actual_z, style = model_output
         images, char_embs, cap_idx, secondary_images, secondary_char_embs, secondary_idx, label, random_image = prepared_input_passthrough_data
-        loss = F.mse_loss(recon_batch, secondary_images, reduction='sum') * self.ratio
-        loss = loss + F.mse_loss(out_z, secondary_images, reduction='sum') * self.secondary_ratio
+        loss = F.mse_loss(unrefined, secondary_images, reduction='sum') * self.ratio
+        # loss = loss + F.mse_loss(recon_batch, secondary_images, reduction='sum') * self.ratio
         return loss
 
 class AdvGANMSELoss(AbstractLossLayer):
@@ -156,7 +157,7 @@ class AdvGANLoss(AbstractLossLayer):
         recon_batch, mu, logvar, out_z, actual_z, style = model_output
         images, char_embs, cap_idx, secondary_images, secondary_char_embs, secondary_idx, label, random_image = prepared_input_passthrough_data
 
-        noisy_fake_images = add_noise(out_z, self.noise_factor)
+        noisy_fake_images = add_noise(recon_batch, self.noise_factor)
         noisy_source_images = add_noise(images, self.noise_factor)
 
         # The generator tries to fool the discriminator
@@ -167,7 +168,7 @@ class AdvGANLoss(AbstractLossLayer):
 
         # The generator tries to match the style of the source images
         self.style_discriminator.eval()
-        style_disc_output = self.style_discriminator(noisy_source_images, recon_batch)
+        style_disc_output = self.style_discriminator(noisy_source_images, noisy_fake_images)
         style_loss = F.binary_cross_entropy_with_logits(style_disc_output, torch.ones_like(style_disc_output))
         self.style_discriminator.train()
 
